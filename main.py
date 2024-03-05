@@ -91,7 +91,7 @@ def to_python_float(t):
 
 class HybridTrainPipe(Pipeline):
     def __init__(self, batch_size, num_threads, device_id, data_dir, crop,
-                 shard_id, num_shards, dali_cpu=False):
+                 shard_id, num_shards, dali_cpu=True):
         super(HybridTrainPipe, self).__init__(batch_size,
                                               num_threads,
                                               device_id,
@@ -118,7 +118,7 @@ class HybridTrainPipe(Pipeline):
                               resize_x=crop,
                               resize_y=crop,
                               interp_type=types.INTERP_TRIANGULAR)
-        self.cmnp = ops.CropMirrorNormalize(device="gpu",
+        self.cmnp = ops.CropMirrorNormalize(device="cpu",  #changed to cpu
                                             dtype=types.FLOAT,
                                             output_layout=types.NCHW,
                                             crop=(crop, crop),
@@ -132,7 +132,7 @@ class HybridTrainPipe(Pipeline):
         self.jpegs, self.labels = self.input(name="Reader")
         images = self.decode(self.jpegs)
         images = self.res(images)
-        output = self.cmnp(images.gpu(), mirror=rng)
+        output = self.cmnp(images.cpu(), mirror=rng) #changed .gpu() to .cpu()
         return [output, self.labels]
 
 class HybridValPipe(Pipeline):
@@ -151,7 +151,7 @@ class HybridValPipe(Pipeline):
         self.res = ops.Resize(device="cpu",
                               resize_shorter=size,
                               interp_type=types.INTERP_TRIANGULAR)
-        self.cmnp = ops.CropMirrorNormalize(device="gpu",
+        self.cmnp = ops.CropMirrorNormalize(device="cpu", #changed to cpu
                                             dtype=types.FLOAT,
                                             output_layout=types.NCHW,
                                             crop=(crop, crop),
@@ -162,7 +162,7 @@ class HybridValPipe(Pipeline):
         self.jpegs, self.labels = self.input(name="Reader")
         images = self.decode(self.jpegs)
         images = self.res(images)
-        output = self.cmnp(images.gpu())
+        output = self.cmnp(images.cpu()) #changed to cpu
         return [output, self.labels]
 
 
@@ -218,7 +218,7 @@ def main():
     args.world_size = 1
 
     if args.distributed:
-        args.gpu = args.local_rank
+        args.cpu = args.local_rank
         torch.cuda.set_device(args.gpu)
         torch.distributed.init_process_group(backend='nccl',
                                              init_method='env://')
