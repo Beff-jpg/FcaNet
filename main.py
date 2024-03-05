@@ -219,7 +219,7 @@ def main():
 
     if args.distributed:
         args.cpu = args.local_rank
-        torch.cuda.set_device(args.gpu)
+        torch.cuda.set_device(args.cpu) #changed to cpu
         torch.distributed.init_process_group(backend='nccl',
                                              init_method='env://')
         args.world_size = torch.distributed.get_world_size()
