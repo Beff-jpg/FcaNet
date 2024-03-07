@@ -185,26 +185,26 @@ def main():
         raise Exception("error: No data set provided")
 
     args.distributed = False
-    if 'WORLD_SIZE' in os.environ:
-        args.distributed = int(os.environ['WORLD_SIZE']) > 1
+    #if 'WORLD_SIZE' in os.environ:
+        #args.distributed = int(os.environ['WORLD_SIZE']) > 1   #removed becuase the world size will always = 1 
 
-    # make apex optional
-    if args.opt_level is not None or args.sync_bn:
-        try:
-            global DDP, amp, optimizers, parallel
-            from apex.parallel import DistributedDataParallel as DDP
-            from apex import amp, optimizers, parallel
-        except ImportError:
-            raise ImportError("Please install apex from https://www.github.com/nvidia/apex to run this example.")
-    if args.opt_level is None and args.distributed:
-        from torch.nn.parallel import DistributedDataParallel as DDP
+    # make apex optional  ## removed because this is related to deterministic computation
+    #if args.opt_level is not None or args.sync_bn:
+        #try:
+            #global DDP, amp, optimizers, parallel
+            #from apex.parallel import DistributedDataParallel as DDP
+            #from apex import amp, optimizers, parallel
+        #except ImportError:
+            #raise ImportError("Please install apex from https://www.github.com/nvidia/apex to run this example.")
+    #if args.opt_level is None and args.distributed:
+        #from torch.nn.parallel import DistributedDataParallel as DDP
 
-    dist_print("opt_level = {}".format(args.opt_level))
-    dist_print("keep_batchnorm_fp32 = {}".format(args.keep_batchnorm_fp32), type(args.keep_batchnorm_fp32))
-    dist_print("loss_scale = {}".format(args.loss_scale), type(args.loss_scale))
-    dist_print("\nCUDNN VERSION: {}\n".format(torch.backends.cudnn.version()))
+    #dist_print("opt_level = {}".format(args.opt_level))
+    #dist_print("keep_batchnorm_fp32 = {}".format(args.keep_batchnorm_fp32), type(args.keep_batchnorm_fp32))
+    #dist_print("loss_scale = {}".format(args.loss_scale), type(args.loss_scale))
+    #dist_print("\nCUDNN VERSION: {}\n".format(torch.backends.cudnn.version()))
 
-    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.benchmark = False      #not needed for CPU only 
     best_prec1 = 0
     if args.deterministic:
         # cudnn.benchmark = False
