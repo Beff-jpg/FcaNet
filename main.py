@@ -205,7 +205,7 @@ def main():
     #dist_print("\nCUDNN VERSION: {}\n".format(torch.backends.cudnn.version()))
 
     torch.backends.cudnn.benchmark = False      #not needed for CPU only 
-    best_prec1 = 0
+    best_prec1 = 0    #why is this repeated 
     if args.deterministic:
         # cudnn.benchmark = False
         # cudnn.deterministic = True
@@ -215,7 +215,7 @@ def main():
 
 
     args.gpu = 0
-    args.world_size = 1
+    args.world_size = 1   #will always be 1 because the CPU has only 1 area to run
 
     if args.distributed:
         args.cpu = args.local_rank
@@ -225,7 +225,7 @@ def main():
         args.world_size = torch.distributed.get_world_size()
 
     args.total_batch_size = args.world_size * args.batch_size
-    assert torch.backends.cudnn.enabled, "Amp requires cudnn backend to be enabled."
+    assert torch.backends.cudnn.enabled, "Amp requires cudnn backend to be enabled." #likely not needed because cudnn will never be enabled coda in
     args.work_dir = os.path.join(args.work_dir, time_stamp + args.arch + args.note)
     if not args.evaluate:
         if args.local_rank == 0:
@@ -262,14 +262,14 @@ def main():
         dist_print("using apex synced BN")
         model = parallel.convert_syncbn_model(model)
 
-    if hasattr(torch, 'channels_last') and  hasattr(torch, 'contiguous_format'):
-        if args.channels_last:
-            memory_format = torch.channels_last
-        else:
-            memory_format = torch.contiguous_format
-        model = model.cuda().to(memory_format=memory_format)
-    else:
-        model = model.cuda()
+    #if hasattr(torch, 'channels_last') and  hasattr(torch, 'contiguous_format'):
+        #if args.channels_last:
+            #memory_format = torch.channels_last
+       # else:
+           # memory_format = torch.contiguous_format
+        #model = model.to(memory_format=memory_format)
+    #else:
+    model = model.cpu()
 
     # Scale learning rate based on global batch size
     args.lr = args.lr*float(args.batch_size*args.world_size)/256.
@@ -307,7 +307,7 @@ def main():
         def resume():
             if os.path.isfile(args.resume):
                 dist_print("=> loading checkpoint '{}'".format(args.resume))
-                checkpoint = torch.load(args.resume, map_location = lambda storage, loc: storage.cuda(args.gpu))
+                checkpoint = torch.load(args.resume, map_location = cpu)
 
                 args.start_epoch = checkpoint['epoch']
                 best_prec1 = checkpoint['best_prec1']
@@ -321,7 +321,7 @@ def main():
     if args.evaluate:
         assert args.evaluate_model is not None
         dist_print("=> loading checkpoint '{}' for eval".format(args.evaluate_model))
-        checkpoint = torch.load(args.evaluate_model, map_location = lambda storage, loc: storage.cuda(args.gpu))
+        checkpoint = torch.load(args.evaluate_model, map_location = torch.device('cpu'))
         if 'state_dict' in checkpoint.keys():
             model.load_state_dict(checkpoint['state_dict'])
         else:
@@ -371,7 +371,7 @@ def main():
 
 
     # criterion = nn.CrossEntropyLoss().cuda()
-    criterion = CrossEntropyLabelSmooth().cuda()
+    criterion = CrossEntropyLabelSmooth()
 
     if args.evaluate:
         validate(val_loader, model, criterion)
@@ -429,38 +429,45 @@ def train(train_loader, model, criterion, optimizer, epoch, logger, scheduler):
 
     for i, data in enumerate(train_loader):
         input = data[0]["data"]
-        target = data[0]["label"].squeeze().cuda().long()
+        target = data[0]["label"].squeeze().long()
         train_loader_len = int(math.ceil(train_loader._size / args.batch_size))
 
-        if args.prof >= 0 and i == args.prof:
+        if args.prof >= 0 and i == args.prof and torch.cuda.is_availible(): #added the is_available() so that'll skip if not ruinning gpu 
             dist_print("Profiling begun at iteration {}".format(i))
             torch.cuda.cudart().cudaProfilerStart()
 
-        if args.prof >= 0: torch.cuda.nvtx.range_push("Body of iteration {}".format(i))
+        if args.prof >= 0 and torch.cuda.is_available():
+            torch.cuda.nvtx.range_push("Body of iteration {}".format(i)) #added the is_available() so that'll skip if not ruinning gpu 
 
         scheduler.step()
         
         # compute output
-        if args.prof >= 0: torch.cuda.nvtx.range_push("forward")
-        output = model(input)
-        if args.prof >= 0: torch.cuda.nvtx.range_pop()
+        if args.prof >= 0 and torch.cuda.is_availible():
+            torch.cuda.nvtx.range_push("forward")
+        if args.prof >= 0 and torch.cuda.is_availible(): 
+            torch.cuda.nvtx.range_pop()
 
+        output = model(input)
         loss = criterion(output, target)
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
 
-        if args.prof >= 0: torch.cuda.nvtx.range_push("backward")
+        if args.prof >= 0 and torch.cuda.is_availible(): 
+            torch.cuda.nvtx.range_push("backward")
         if args.opt_level is not None:
             with amp.scale_loss(loss, optimizer) as scaled_loss:
                 scaled_loss.backward()
         else:
             loss.backward()
-        if args.prof >= 0: torch.cuda.nvtx.range_pop()
+        if args.prof >= 0  if args.prof >= 0 and torch.cuda.is_availible(): 
+            torch.cuda.nvtx.range_pop()
 
-        if args.prof >= 0: torch.cuda.nvtx.range_push("optimizer.step()")
+        if args.prof >= 0 and torch.cuda.is_availible(): 
+            torch.cuda.nvtx.range_push("optimizer.step()")
         optimizer.step()
-        if args.prof >= 0: torch.cuda.nvtx.range_pop()
+        if args.prof >= 0 and torch.cuda.is_availible(): 
+            torch.cuda.nvtx.range_pop()
 
         if i%args.print_freq == 0:
             # Every print_freq iterations, check the loss, accuracy, and speed.
@@ -472,7 +479,7 @@ def train(train_loader, model, criterion, optimizer, epoch, logger, scheduler):
 
             # Average loss and accuracy across processes for logging
             if args.distributed:
-                reduced_loss = reduce_tensor(loss.data)
+                reduced_loss = reduce_tensor(loss.data)      #this should be fine to run in cpu only mode, but the loss will not be reduced. 
                 prec1 = reduce_tensor(prec1)
                 prec5 = reduce_tensor(prec5)
             else:
@@ -483,7 +490,7 @@ def train(train_loader, model, criterion, optimizer, epoch, logger, scheduler):
             top1.update(to_python_float(prec1), input.size(0))
             top5.update(to_python_float(prec5), input.size(0))
 
-            torch.cuda.synchronize()
+            #torch.cuda.synchronize()
             batch_time.update((time.time() - end)/args.print_freq)
             end = time.time()
 
@@ -505,16 +512,17 @@ def train(train_loader, model, criterion, optimizer, epoch, logger, scheduler):
                 logger.add_scalar('Train/top5', top5.val, global_step = epoch * train_loader_len + i)
                 logger.add_scalar('Meta/lr', optimizer.param_groups[0]['lr'], global_step=epoch * train_loader_len + i)
         # Pop range "Body of iteration {}".format(i)
-        if args.prof >= 0: torch.cuda.nvtx.range_pop()
+        if args.prof >= 0 and torch.cuda.is_availible(): 
+            torch.cuda.nvtx.range_pop()
 
-        if args.prof >= 0 and i == args.prof + 10:
+        if args.prof >= 0 and i == args.prof + 10 and torch.cuda.is_availible():
             print("Profiling ended at iteration {}".format(i))
             torch.cuda.cudart().cudaProfilerStop()
             quit()
 
     return batch_time.avg
 
-@torch.no_grad()
+@torch.no_grad()   #disables temporarily gradient computation 
 def validate(val_loader, model, criterion):
     batch_time = AverageMeter()
     losses = AverageMeter()
