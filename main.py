@@ -14,13 +14,13 @@ from utils.dist_utils import dist_print, DistSummaryWriter
 import datetime
 from utils.utils import CosineAnnealingLR, CrossEntropyLabelSmooth
 from model.fcanet import fcanet34, fcanet50, fcanet101, fcanet152
-try:
-    from nvidia.dali.plugin.pytorch import DALIClassificationIterator
-    from nvidia.dali.pipeline import Pipeline
-    import nvidia.dali.ops as ops
-    import nvidia.dali.types as types
-except ImportError:
-    raise ImportError("Please install DALI from https://www.github.com/NVIDIA/DALI to run this example.")
+#try:
+    #rom nvidia.dali.plugin.pytorch import DALIClassificationIterator
+    #from nvidia.dali.pipeline import Pipeline
+    #import nvidia.dali.ops as ops
+    #import nvidia.dali.types as types
+#except ImportError:
+    #raise ImportError("Please install DALI from https://www.github.com/NVIDIA/DALI to run this example.")
 
 def parse():
     model_names = sorted(name for name in models.__dict__
@@ -460,7 +460,7 @@ def train(train_loader, model, criterion, optimizer, epoch, logger, scheduler):
                 scaled_loss.backward()
         else:
             loss.backward()
-        if args.prof >= 0  if args.prof >= 0 and torch.cuda.is_availible(): 
+        if args.prof >= 0 and torch.cuda.is_availible(): 
             torch.cuda.nvtx.range_pop()
 
         if args.prof >= 0 and torch.cuda.is_availible(): 
