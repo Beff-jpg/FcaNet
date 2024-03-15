@@ -16,7 +16,7 @@ from utils.utils import CosineAnnealingLR, CrossEntropyLabelSmooth
 from model.fcanet import fcanet34, fcanet50, fcanet101, fcanet152
 #try:
     #rom nvidia.dali.plugin.pytorch import DALIClassificationIterator
-    #from nvidia.dali.pipeline import Pipeline
+from nvidia.dali.pipeline import Pipeline
     #import nvidia.dali.ops as ops
     #import nvidia.dali.types as types
 #except ImportError:
